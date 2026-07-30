@@ -4,20 +4,20 @@ export type Leader = {
   name: string;
 };
 
-export type CommunityData = {
-  type: string;
-  id: number;
+export type CoolRow = {
+  type: "cool";
+  code: string;
   name: string;
   campusCode: string;
   campusName: string;
-  leaders: {
-    type: string;
-    communityId: string;
-    name: string;
-  }[];
+  leaders: Leader[];
   status: "active" | "inactive" | string;
 };
 
-export interface CommunityResponse {
-  data: CommunityData[];
-}
+export type CoolsResponse = {
+  code: number;
+  status: string;
+  message: string;
+  data: CoolRow[];
+  metadata?: { totalRows?: number };
+};

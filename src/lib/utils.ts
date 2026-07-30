@@ -95,7 +95,7 @@ export const formatDate = (date: Date): string => {
   // Manually insert the comma after the weekday
   const dateParts = formattedDate.split(" ");
   // Reconstruct date with comma
-  const formattedDateWithComma = `${dateParts[0]}, ${dateParts
+  const formattedDateWithComma = `${dateParts[0]} ${dateParts
     .slice(1)
     .join(" ")}`;
 

@@ -201,7 +201,7 @@ function EventsAdmin() {
       setIsLoading(true); // Set loading to true before fetching
 
       try {
-        const response = await fetch(`${API_BASE_URL}/api/v2/events`, {
+        const response = await fetch(`${API_BASE_URL}/api/v2/internal/events`, {
           headers: {
             "X-API-KEY": API_KEY || "",
             "Content-Type": "application/json",
@@ -248,142 +248,297 @@ function EventsAdmin() {
     setSelectedEvent(null);
   };
 
+  const mainSpacing = isSmallScreen ? "space-y-6" : "space-y-8";
+
   return (
-    <>
-      <div className="flex min-h-screen w-full flex-col gap-y-4">
-        <HeaderNav name="Admin Dashboard" link="home"></HeaderNav>
-        <div className="container mx-auto p-4">
-          <h1 className="text-2xl font-bold mb-4">Users List</h1>
-          <div className="flex w-full max-w-sm items-center space-x-2">
-            {" "}
-            <Input
-              type="search"
-              placeholder="Search a user"
-              className="w-full rounded-lg bg-background pl-8"
-              onChange={(e) => {
-                const value = e.target.value;
-                setSearchQuery(value);
-                if (value === "") {
-                  setSearchQuery(null);
-                  setUsers([]); // Clear users when search query is empty
-                }
-              }}
-            />
-            <Button
-              type="submit"
-              onClick={() => {
-                fetchUsers(null, null, searchQuery);
-              }}
-            >
-              Search
-            </Button>
-            <Button
-              variant={"destructive"}
-              type="reset"
-              onClick={() => {
-                setSearchQuery(null);
-                setUsers([]); // Clear users when search query is empty
-              }}
-            >
-              Clear
-            </Button>
-          </div>
-        </div>
-
-        <div className="container mx-auto p-4">
-          {users && users.length > 0 && (
-            <>
-              <h1 className="text-2xl font-bold mb-2">Search Results</h1>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Community ID</TableHead>
-                    <TableHead>User Type</TableHead>
-                    <TableHead>Upgrade to Worker</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users.map((user) => (
-                    <TableRow key={user.email}>
-                      <TableCell>{user.name}</TableCell>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell>{user.communityId}</TableCell>
-                      <TableCell>{user.userTypes.join(", ")}</TableCell>
-                      <TableCell>
-                        {user.userTypes.includes("user") && (
-                          <Button onClick={() => upgradeUser(user.communityId)}>
-                            Upgrade
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </>
-          )}
-
-          <h1 className="text-2xl font-bold mt-8 mb-4">Events List</h1>
-          {isLoading ? (
-            <p>Loading...</p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="hidden sm:table-cell">
-                    Description
-                  </TableHead>
-                  <TableHead className="hidden sm:table-cell">
-                    Registration
-                  </TableHead>
-                  <TableHead>Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {events.map((event) => (
-                  <TableRow key={event.code}>
-                    <TableCell>{event.title}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {event.availabilityStatus}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      {event.topics.join(", ")}
-                    </TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      {formatDate(event.registerStartAt)} -{" "}
-                      {formatDate(event.registerEndAt)}
-                    </TableCell>
-                    <TableCell>
-                      {(event.availabilityStatus === "available" ||
-                        event.availabilityStatus === "soon" ||
-                        event.availabilityStatus === "closed") && (
-                        <Button onClick={() => handleSession(event.code)}>
-                          View Details
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </div>
-        <div className="container mx-auto p-4 ">
-          <Link
-            href={"dashboard/new-joiners"}
-            className="text-xl w-[20%] mb-2 hover:underline hover:text-blue-800 border p-4 rounded-xl hover:bg-blue-300  flex items-center justify-start"
-          >
-            View COOL New Joiners
-          </Link>
-        </div>
+    <div className="relative min-h-screen w-full bg-gradient-to-br from-slate-50 via-white to-slate-100 text-slate-900">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute left-16 top-16 h-40 w-40 rounded-full bg-indigo-200/60 blur-3xl" />
+        <div className="absolute right-10 top-10 h-56 w-56 rounded-full bg-emerald-200/60 blur-3xl" />
+        <div className="absolute bottom-10 left-1/3 h-48 w-48 rounded-full bg-sky-200/50 blur-3xl" />
       </div>
-    </>
+      <HeaderNav name="Admin Dashboard" link="home" />
+      <main
+        className={`container relative z-10 mx-auto ${mainSpacing} px-4 pb-12 pt-6`}
+      >
+        <div className="grid gap-6 lg:grid-cols-[3fr,2fr]">
+          <Card className="border-slate-200 bg-white shadow-xl">
+            <CardHeader className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant="secondary"
+                  className="bg-indigo-100 text-indigo-700"
+                >
+                  Admin tools
+                </Badge>
+                <Badge
+                  variant="outline"
+                  className="border-slate-200 text-slate-700"
+                >
+                  Users
+                </Badge>
+              </div>
+              <CardTitle className="text-2xl text-slate-900">
+                Manage community members
+              </CardTitle>
+              <CardDescription className="text-slate-600">
+                Search for members and quickly upgrade them to workers without
+                leaving the dashboard.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-col gap-3 md:flex-row">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    type="search"
+                    placeholder="Search a user by name"
+                    className="w-full rounded-xl border-slate-200 bg-white pl-10 text-slate-900 shadow-sm placeholder:text-slate-400"
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSearchQuery(value);
+                      if (value === "") {
+                        setSearchQuery(null);
+                        setUsers([]); // Clear users when search query is empty
+                      }
+                    }}
+                  />
+                </div>
+                <div className="flex gap-2 md:w-auto">
+                  <Button
+                    type="submit"
+                    className="flex-1 rounded-xl bg-indigo-600 text-white shadow-md shadow-indigo-200 transition hover:-translate-y-0.5 hover:bg-indigo-500"
+                    onClick={() => {
+                      fetchUsers(null, null, searchQuery);
+                    }}
+                  >
+                    Search
+                  </Button>
+                  <Button
+                    variant="outline"
+                    type="reset"
+                    className="flex-1 rounded-xl border-slate-200 bg-slate-50 text-slate-800 transition hover:-translate-y-0.5 hover:border-red-300 hover:bg-red-50"
+                    onClick={() => {
+                      setSearchQuery(null);
+                      setUsers([]); // Clear users when search query is empty
+                    }}
+                  >
+                    Clear
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-slate-200 bg-gradient-to-b from-white via-slate-50 to-white shadow-lg">
+            <CardHeader className="space-y-2">
+              <CardTitle className="flex items-center justify-between text-lg text-slate-900">
+                Quick links
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Link
+                href={"dashboard/new-joiners"}
+                className="group flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-slate-900 transition hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-50"
+              >
+                <div>
+                  <p className="text-sm font-medium text-slate-900">
+                    View COOL New Joiners
+                  </p>
+                  <p className="text-xs text-slate-600">
+                    See the latest members joining your community.
+                  </p>
+                </div>
+              </Link>
+              <Link
+                href={"dashboard/create-event"}
+                className="group flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-slate-900 transition hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-50"
+              >
+                <div>
+                  <p className="text-sm font-medium text-slate-900">
+                    Create Event
+                  </p>
+                  <p className="text-xs text-slate-600">
+                    Create a new event for Grow Community.
+                  </p>
+                </div>
+              </Link>{" "}
+              <Link
+                href={"dashboard/create-instance"}
+                className="group flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-left text-slate-900 transition hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-emerald-50"
+              >
+                <div>
+                  <p className="text-sm font-medium text-slate-900">
+                    Create Instance
+                  </p>
+                  <p className="text-xs text-slate-600">
+                    Create a new instance for from existing event.
+                  </p>
+                </div>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
+
+        {users && users.length > 0 && (
+          <Card className="border-slate-200 bg-white shadow-xl">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between text-xl text-slate-900">
+                Search Results
+                <Badge
+                  variant="outline"
+                  className="border-slate-200 text-slate-700"
+                >
+                  {users.length} found
+                </Badge>
+              </CardTitle>
+              <CardDescription className="text-slate-600">
+                Upgrade qualified members to workers directly from the list.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="overflow-hidden rounded-xl border border-slate-200">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-slate-200">
+                      <TableHead className="text-slate-700">Name</TableHead>
+                      <TableHead className="text-slate-700">Email</TableHead>
+                      <TableHead className="text-slate-700">
+                        Community ID
+                      </TableHead>
+                      <TableHead className="text-slate-700">
+                        User Type
+                      </TableHead>
+                      <TableHead className="text-slate-700">Upgrade</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {users.map((user) => (
+                      <TableRow
+                        key={user.email}
+                        className="border-slate-100 hover:bg-slate-50"
+                      >
+                        <TableCell className="font-medium text-slate-900">
+                          {user.name}
+                        </TableCell>
+                        <TableCell className="text-slate-700">
+                          {user.email}
+                        </TableCell>
+                        <TableCell className="text-slate-700">
+                          {user.communityId}
+                        </TableCell>
+                        <TableCell className="text-slate-700">
+                          <div className="flex flex-wrap gap-1">
+                            {user.userTypes.map((type) => (
+                              <Badge
+                                key={type}
+                                variant="outline"
+                                className="border-slate-200 bg-slate-50 text-slate-700"
+                              >
+                                {type}
+                              </Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {user.userTypes.includes("user") && (
+                            <Button
+                              className="rounded-lg bg-emerald-500 text-white shadow-md shadow-emerald-200 transition hover:-translate-y-0.5 hover:bg-emerald-400"
+                              onClick={() => upgradeUser(user.communityId)}
+                            >
+                              Upgrade
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        <Card className="border-slate-200 bg-white shadow-xl">
+          <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <CardTitle className="text-xl text-slate-900">
+                Events List
+              </CardTitle>
+              <CardDescription className="text-slate-600">
+                Track event status, topics, and registration windows.
+              </CardDescription>
+            </div>
+            <Badge variant="secondary" className="bg-sky-100 text-sky-700">
+              {events.length} total
+            </Badge>
+          </CardHeader>
+          <CardContent className="overflow-hidden rounded-xl border border-slate-200">
+            {isLoading ? (
+              <div className="flex items-center justify-center gap-3 py-10 text-slate-600">
+                <LoadingSpinner />
+                <span>Loading events...</span>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-slate-200">
+                      <TableHead className="text-slate-700">Title</TableHead>
+                      {/* <TableHead className="text-slate-700">Status</TableHead>
+                      <TableHead className="hidden text-slate-700 sm:table-cell">
+                        Topics
+                      </TableHead>
+                      <TableHead className="hidden text-slate-700 sm:table-cell">
+                        Registration
+                      </TableHead> */}
+                      <TableHead className="text-slate-700">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {events.map((event) => (
+                      <TableRow
+                        key={event.code}
+                        className="border-slate-100 hover:bg-slate-50"
+                      >
+                        <TableCell className="font-medium text-slate-900">
+                          {event.title}
+                        </TableCell>
+                        {/* <TableCell>
+                          <Badge
+                            variant="outline"
+                            className="border-slate-200 bg-slate-50 text-slate-700"
+                          >
+                            {event.availabilityStatus}
+                          </Badge>
+                        </TableCell> */}
+                        {/* <TableCell className="hidden text-slate-700 sm:table-cell">
+                            {event.topics.join(", ")}
+                          </TableCell> */}
+                        {/* <TableCell className="hidden text-slate-700 sm:table-cell">
+                          {formatDate(event.registerStartAt)} -{" "}
+                          {formatDate(event.registerEndAt)}
+                        </TableCell> */}
+                        <TableCell>
+                          {
+                            <Button
+                              className="rounded-lg bg-blue-600 text-white shadow-md shadow-blue-200 transition hover:-translate-y-0.5 hover:bg-blue-500"
+                              onClick={() => handleSession(event.code)}
+                            >
+                              View Details
+                            </Button>
+                          }
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </main>
+    </div>
   );
 }
 

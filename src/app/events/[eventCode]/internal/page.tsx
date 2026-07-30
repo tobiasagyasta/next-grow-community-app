@@ -94,36 +94,39 @@ const EventInternal = () => {
         ) : instances.length === 0 ? (
           <p className="text-center">No instances available for this event.</p>
         ) : (
-          // Display fetched instances
-          instances.map((instance) => (
-            <Card
-              key={instance.code}
-              className="rounded-xl mx-2 my-5 md:w-1/2 md:mx-auto"
-            >
-              <div className="flex flex-col">
-                <CardHeader>
-                  <CardTitle>{instance.title}</CardTitle> {/* Instance Title */}
-                </CardHeader>
-                <CardContent className="flex flex-col">
-                  <Badge
-                    className={`flex w-fit p-2 text-center justify-center items-center mb-2 ${
-                      instance.availabilityStatus === "available"
-                        ? "bg-green-700"
-                        : instance.availabilityStatus === "unavailable"
-                        ? "bg-red-500"
-                        : "bg-gray-400" // Default color for other statuses
-                    }`}
-                  >
-                    <span className="mx-auto">
-                      {instance.availabilityStatus}
-                    </span>
-                  </Badge>
+          // Display fetched instances (only show cards for available instances)
+          instances
+            .filter((instance) => instance.availabilityStatus === "available")
+            .map((instance) => (
+              <Card
+                key={instance.code}
+                className="rounded-xl mx-2 my-5 md:w-1/2 md:mx-auto"
+              >
+                <div className="flex flex-col">
+                  <CardHeader>
+                    <CardTitle>{instance.title}</CardTitle>{" "}
+                    {/* Instance Title */}
+                  </CardHeader>
+                  <CardContent className="flex flex-col">
+                    <Badge
+                      className={`flex w-fit p-2 text-center justify-center items-center mb-2 ${
+                        instance.availabilityStatus === "available"
+                          ? "bg-green-700"
+                          : instance.availabilityStatus === "unavailable"
+                          ? "bg-red-500"
+                          : "bg-gray-400" // Default color for other statuses
+                      }`}
+                    >
+                      <span className="mx-auto">
+                        {instance.availabilityStatus}
+                      </span>
+                    </Badge>
 
-                  <p className="text-base font-light my-2 pb-2">
-                    {instance.LocationName}
-                  </p>
-                  <Separator />
-                  {/* <div className="mt-2 pt-4">
+                    <p className="text-base font-light my-2 pb-2">
+                      {instance.LocationName}
+                    </p>
+                    <Separator />
+                    {/* <div className="mt-2 pt-4">
                     <p className="font-semibold text-gray-700">Event Time:</p>
                     <p className="text-sm text-gray-500 my-3">
                       <span className="font-medium text-gray-700">
@@ -132,27 +135,27 @@ const EventInternal = () => {
                     </p>
                   </div> */}
 
-                  <Separator />
-                </CardContent>
-                <CardFooter>
-                  {/* Link to register instances page */}
-                  {instance.availabilityStatus === "available" ? (
-                    <VerifyTicketDialog
-                      eventName={details.title ?? "Homebase"}
-                      eventCode={
-                        Array.isArray(eventCode) ? eventCode[0] : eventCode
-                      }
-                      sessionCode={instance.code}
-                      sessionName={instance.title}
-                      onlineEvent={true}
-                    />
-                  ) : (
-                    <Button disabled>Registration Closed</Button>
-                  )}
-                </CardFooter>
-              </div>
-            </Card>
-          ))
+                    <Separator />
+                  </CardContent>
+                  <CardFooter>
+                    {/* Link to register instances page */}
+                    {instance.availabilityStatus === "available" ? (
+                      <VerifyTicketDialog
+                        eventName={details.title ?? "Homebase"}
+                        eventCode={
+                          Array.isArray(eventCode) ? eventCode[0] : eventCode
+                        }
+                        sessionCode={instance.code}
+                        sessionName={instance.title}
+                        onlineEvent={true}
+                      />
+                    ) : (
+                      <Button disabled>Registration Closed</Button>
+                    )}
+                  </CardFooter>
+                </div>
+              </Card>
+            ))
         )}
       </main>
     </>

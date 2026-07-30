@@ -18,6 +18,7 @@ import { useAuth } from "@/components/providers/AuthProvider";
 import withAuth from "@/components/providers/AuthWrapper";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/use-toast";
+import SnowfallComponent from "@/components/SnowfallComponent";
 
 const EventRegistration = () => {
   const { eventCode, sessionCode, maxRegistrants } = useParams();
@@ -33,14 +34,106 @@ const EventRegistration = () => {
   const [identifier, setIdentifier] = useState<string>(userData.email); // New state for identifier
   const router = useRouter();
   const { toast } = useToast();
+  const [availableSlots, setAvailableSlots] = useState<number | null>(null);
+
+  const parsedMaxRegistrants = parseInt(maxRegistrants as string);
+  const maxSelectableRegistrants = Number.isNaN(parsedMaxRegistrants)
+    ? 4
+    : Math.min(4, parsedMaxRegistrants); // temporary cap at 4 even if backend allows more
 
   const incrementRegistrants = () => {
-    if (numberOfRegistrants <= 3) {
-      if (numberOfRegistrants < parseInt(maxRegistrants as string)) {
-        setNumberOfRegistrants((prev) => prev + 1);
-      }
+    const maxAllowed =
+      availableSlots === null
+        ? maxSelectableRegistrants
+        : Math.min(maxSelectableRegistrants, availableSlots);
+    if (maxAllowed <= 0) {
+      return;
+    }
+    if (numberOfRegistrants < maxAllowed) {
+      setNumberOfRegistrants((prev) => prev + 1);
     }
   };
+
+  const fetchExistingInstanceRegistrations = async (): Promise<void> => {
+    const token = await getValidAccessToken();
+    if (!token) {
+      handleExpiredToken();
+      return;
+    }
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v2/events/registers`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          "X-API-Key": API_KEY,
+        },
+      });
+
+      if (response.status === 401) {
+        handleExpiredToken();
+        return;
+      }
+
+      const data = await response.json();
+      const targetEvent = data?.data?.find(
+        (event: any) => event.code === eventCode
+      );
+
+      if (!targetEvent) {
+        setAvailableSlots(maxSelectableRegistrants);
+        if (numberOfRegistrants > maxSelectableRegistrants) {
+          setNumberOfRegistrants(maxSelectableRegistrants);
+        }
+        return;
+      }
+
+      const targetInstance = (targetEvent.instances ?? []).find(
+        (instance: any) => instance.code === sessionCode
+      );
+
+      if (!targetInstance) {
+        setAvailableSlots(maxSelectableRegistrants);
+        if (numberOfRegistrants > maxSelectableRegistrants) {
+          setNumberOfRegistrants(maxSelectableRegistrants);
+        }
+        return;
+      }
+
+      const totalRegistrants = (targetInstance.registrants ?? []).filter(
+        (registrant: any) => registrant.registrationStatus !== "cancelled"
+      ).length;
+
+      const remaining = Math.max(0, 4 - totalRegistrants);
+      setAvailableSlots(Math.min(maxSelectableRegistrants, remaining));
+      if (remaining <= 0) {
+        toast({
+          title: "Registration Failed!",
+          description:
+            "You have registered for more than 4 times in this instance.",
+          className: "bg-red-400",
+          duration: 2000,
+        });
+        router.push("/events");
+      } else if (numberOfRegistrants > remaining) {
+        setNumberOfRegistrants(remaining);
+      }
+    } catch (error) {
+      console.error("Failed to fetch event registration count:", error);
+      toast({
+        title: "Registration Failed!",
+        description:
+          "Could not verify existing registrations. Please try again.",
+        className: "bg-red-400",
+        duration: 2000,
+      });
+    }
+  };
+
+  React.useEffect(() => {
+    fetchExistingInstanceRegistrations();
+    // We intentionally do not add dependencies to avoid refetch loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const decrementRegistrants = () => {
     if (numberOfRegistrants > 1) {
@@ -49,11 +142,34 @@ const EventRegistration = () => {
   };
 
   const handleConfirm = () => {
+    if (availableSlots !== null && availableSlots <= 0) {
+      toast({
+        title: "Registration Limit Reached",
+        description: "No slots remaining for this instance.",
+        className: "bg-red-400",
+        duration: 2500,
+      });
+      return;
+    }
+
+    if (numberOfRegistrants < 1) {
+      toast({
+        title: "Registration Limit Reached",
+        description: "No slots remaining for this instance.",
+        className: "bg-red-400",
+        duration: 2500,
+      });
+      return;
+    }
+
     setConfirmed(true);
     const newRegistrantData = Array.from(
       { length: numberOfRegistrants },
       (_, index) => ({
-        name: registrantData[index]?.name || "",
+        // Prefill first registrant with user name
+        name:
+          registrantData[index]?.name ??
+          (index === 0 ? userData?.name ?? "" : ""),
       })
     );
     setRegistrantData(newRegistrantData);
@@ -88,11 +204,28 @@ const EventRegistration = () => {
     const accessToken = await getValidAccessToken();
     if (!accessToken) {
       handleExpiredToken();
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (
+      availableSlots !== null &&
+      (availableSlots <= 0 ||
+        registrantData.length > availableSlots ||
+        numberOfRegistrants < 1)
+    ) {
+      toast({
+        title: "Registration Limit Reached",
+        description: "No slots remaining for this instance.",
+        className: "bg-red-400",
+        duration: 2500,
+      });
+      setIsSubmitting(false);
       return;
     }
 
     const payload = {
-      communityId: userData.communityId,
+      // communityId: userData.communityId,
       eventCode: eventCode,
       instanceCode: sessionCode,
       identifier: identifier.trim(),
@@ -161,6 +294,7 @@ const EventRegistration = () => {
   return (
     <>
       <HeaderNav name="Register" link={`events/${eventCode}`} />
+      {/* <SnowfallComponent /> */}
       <main className="my-4">
         {!confirmed && (
           <div className="flex flex-col items-center space-y-10">
@@ -257,6 +391,7 @@ const EventRegistration = () => {
                           handleInputChange(index, "name", e.target.value)
                         }
                         required
+                        autoFocus={index === 0}
                       />
                     </div>
                   </CardContent>

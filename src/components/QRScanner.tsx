@@ -17,12 +17,14 @@ interface QrCodeScannerProps {
   sessionCode: string;
   eventCode: string;
   onlineEvent?: boolean;
+  irNumber?: string;
 }
 
 function QrCodeScanner({
   sessionCode,
   eventCode,
   onlineEvent = false,
+  irNumber,
 }: QrCodeScannerProps) {
   const { isAuthenticated, handleExpiredToken, getValidAccessToken } =
     useAuth();
@@ -119,6 +121,11 @@ function QrCodeScanner({
           sessionCodeToUse = sessionCode;
         }
 
+        const registrationDescriptionBase = onlineEvent ? "online" : "offline";
+        const registrationDescription = irNumber
+          ? `offline - ${irNumber}`
+          : registrationDescriptionBase;
+
         // Run the POST request to register the user
         const postResponse = await fetch(
           `${API_BASE_URL}/api/v2/events/registers`,
@@ -136,7 +143,9 @@ function QrCodeScanner({
               isPersonalQR: true,
               name: userData.name,
               registerAt: new Date().toISOString(),
-              description: "offline",
+              description: irNumber
+                ? registrationDescription
+                : registrationDescriptionBase,
             }),
           }
         );
@@ -146,7 +155,11 @@ function QrCodeScanner({
         if (postResponse.ok) {
           const responseData = await postResponse.json();
           setDialogTitle("Success!");
-          setDialogDescription(`User ${responseData.name} registered.`);
+          setDialogDescription(
+            `User ${responseData.name} registered${
+              irNumber ? ` for ${irNumber}` : ""
+            }.`
+          );
           setDialogVariant("success");
         } else {
           if (postResponse.status === 401) {

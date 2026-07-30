@@ -33,9 +33,14 @@ const EventRegistration = () => {
   const [identifier, setIdentifier] = useState<string>(userData.email); // New state for identifier
   const router = useRouter();
   const { toast } = useToast();
+  const [availableSlots, setAvailableSlots] = useState<number | null>(null);
 
   const incrementRegistrants = () => {
-    if (numberOfRegistrants <= 3) {
+    const maxAllowed = availableSlots === null ? 4 : Math.min(4, availableSlots);
+    if (maxAllowed <= 0) {
+      return;
+    }
+    if (numberOfRegistrants < maxAllowed) {
       setNumberOfRegistrants((prev) => prev + 1);
     }
   };
@@ -47,6 +52,24 @@ const EventRegistration = () => {
   };
 
   const handleConfirm = () => {
+    if (availableSlots !== null && availableSlots <= 0) {
+      toast({
+        title: "Registration Limit Reached",
+        description: "No slots remaining for this instance.",
+        className: "bg-red-400",
+        duration: 2500,
+      });
+      return;
+    }
+    if (numberOfRegistrants < 1) {
+      toast({
+        title: "Registration Limit Reached",
+        description: "No slots remaining for this instance.",
+        className: "bg-red-400",
+        duration: 2500,
+      });
+      return;
+    }
     setConfirmed(true);
     const newRegistrantData = Array.from(
       { length: numberOfRegistrants },
@@ -79,6 +102,82 @@ const EventRegistration = () => {
     }
   };
 
+  const fetchAvailableSlots = async () => {
+    const token = await getValidAccessToken();
+    if (!token) {
+      handleExpiredToken();
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v2/events/registers`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          "X-API-Key": API_KEY,
+        },
+      });
+
+      if (response.status === 401) {
+        handleExpiredToken();
+        return;
+      }
+
+      const data = await response.json();
+      const targetEvent = data?.data?.find(
+        (event: any) => event.code === eventCode
+      );
+
+      if (!targetEvent) {
+        setAvailableSlots(4);
+        if (numberOfRegistrants > 4) {
+          setNumberOfRegistrants(4);
+        }
+        return;
+      }
+
+      const targetInstance = (targetEvent?.instances ?? []).find(
+        (instance: any) => instance.code === sessionCode
+      );
+
+      if (!targetInstance) {
+        setAvailableSlots(4);
+        if (numberOfRegistrants > 4) {
+          setNumberOfRegistrants(4);
+        }
+        return;
+      }
+
+      const existingRegistrations = (targetInstance?.registrants ?? []).filter(
+        (registrant: any) => registrant.registrationStatus !== "cancelled"
+      ).length;
+
+      const remaining = Math.max(0, 4 - existingRegistrations);
+      setAvailableSlots(Math.min(4, remaining));
+
+      if (remaining <= 0) {
+        setNumberOfRegistrants(0);
+      } else if (numberOfRegistrants > remaining) {
+        setNumberOfRegistrants(remaining);
+      }
+    } catch (error) {
+      console.error("Failed to fetch event registration count:", error);
+      toast({
+        title: "Registration Failed!",
+        description:
+          "Could not verify existing registrations. Please try again.",
+        className: "bg-red-400",
+        duration: 2000,
+      });
+    }
+  };
+
+  React.useEffect(() => {
+    fetchAvailableSlots();
+    // We intentionally do not add dependencies to avoid refetch loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -86,6 +185,23 @@ const EventRegistration = () => {
     const accessToken = await getValidAccessToken();
     if (!accessToken) {
       handleExpiredToken();
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (
+      availableSlots !== null &&
+      (availableSlots <= 0 ||
+        registrantData.length > availableSlots ||
+        numberOfRegistrants < 1)
+    ) {
+      toast({
+        title: "Registration Limit Reached",
+        description: "No slots remaining for this instance.",
+        className: "bg-red-400",
+        duration: 2500,
+      });
+      setIsSubmitting(false);
       return;
     }
 

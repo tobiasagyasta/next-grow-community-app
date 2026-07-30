@@ -5,6 +5,13 @@ import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { API_BASE_URL, API_KEY } from "@/lib/config";
 import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
   Table,
   TableBody,
   TableCaption,
@@ -13,10 +20,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Search } from "lucide-react";
+import { Download, Loader2, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
 import {
   Pagination,
   PaginationContent,
@@ -30,6 +35,8 @@ import { useAuth } from "@/components/providers/AuthProvider";
 import HeaderNav from "@/components/HeaderNav";
 import VerifyTicketDialog from "@/components/VerifyTicketDialog";
 import { useToast } from "@/components/ui/use-toast";
+import { cn } from "@/lib/utils";
+import QRDownloader from "@/components/QRDownloader";
 
 interface EventDetails {
   type: string;
@@ -74,6 +81,8 @@ interface Pagination {
   totalData: number;
 }
 
+type EventReportDownload = "csv" | "xlsx" | null;
+
 function EventSessionsAdmin({ params }: { params: { eventCode: string } }) {
   const router = useRouter();
   const [eventDetails, setEventDetails] = useState<EventDetails | null>(null);
@@ -84,6 +93,8 @@ function EventSessionsAdmin({ params }: { params: { eventCode: string } }) {
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
   const { handleExpiredToken, getValidAccessToken } = useAuth();
   const [selectedSession, setSelectedSession] = useState<string | null>(null);
+  const [reportDownload, setReportDownload] =
+    useState<EventReportDownload>(null);
   const { toast } = useToast();
 
   const fetchEventDetails = async () => {
@@ -175,6 +186,12 @@ function EventSessionsAdmin({ params }: { params: { eventCode: string } }) {
     fetchUsers();
   }, []);
 
+  useEffect(() => {
+    if (sessions.length > 0 && !selectedSession) {
+      setSelectedSession(sessions[0].code);
+    }
+  }, [sessions, selectedSession]);
+
   const registerUser = async (user: User) => {
     if (!selectedSession) {
       toast({
@@ -239,6 +256,106 @@ function EventSessionsAdmin({ params }: { params: { eventCode: string } }) {
     }
   };
 
+  const getDownloadFilename = (
+    response: Response,
+    fallbackFilename: string,
+  ) => {
+    const contentDisposition = response.headers.get("content-disposition");
+    const filenameMatch = contentDisposition?.match(
+      /filename\*?=(?:UTF-8'')?["']?([^"';]+)["']?/i,
+    );
+
+    return filenameMatch?.[1]
+      ? decodeURIComponent(filenameMatch[1])
+      : fallbackFilename;
+  };
+
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadEventReport = async (
+    format: Exclude<EventReportDownload, null>,
+  ) => {
+    if (!selectedSession) {
+      toast({
+        title: "Error",
+        description: "Please select an instance before downloading a report.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const accessToken = await getValidAccessToken();
+    if (!accessToken) {
+      router.push("/login/v2");
+      return;
+    }
+
+    const searchParams = new URLSearchParams({
+      format,
+      eventCode: params.eventCode,
+      instanceCode: selectedSession,
+    });
+
+    const fallbackFilename = `${params.eventCode}-${selectedSession}-registrations.${format}`;
+
+    setReportDownload(format);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/v2/internal/events/registers/download?${searchParams.toString()}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "X-API-Key": API_KEY || "",
+          },
+        },
+      );
+
+      if (response.status === 401) {
+        handleExpiredToken();
+        return;
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.message || "Failed to download report.");
+      }
+
+      const blob = await response.blob();
+      downloadBlob(blob, getDownloadFilename(response, fallbackFilename));
+
+      toast({
+        title: "Report downloaded",
+        description: `${eventDetails?.title ?? params.eventCode} registrations ${format.toUpperCase()} export is ready.`,
+      });
+    } catch (error) {
+      console.error("Error downloading event report:", error);
+      toast({
+        title: "Error",
+        description:
+          error instanceof Error
+            ? error.message
+            : "An error occurred while downloading the report.",
+        variant: "destructive",
+      });
+    } finally {
+      setReportDownload(null);
+    }
+  };
+
+  const selectedSessionDetails = sessions.find(
+    (session) => session.code === selectedSession
+  );
+
   return (
     <>
       <HeaderNav
@@ -292,6 +409,9 @@ function EventSessionsAdmin({ params }: { params: { eventCode: string } }) {
                   <TableHead className="hidden sm:table-cell">
                     Hardware Scan
                   </TableHead>
+                  <TableHead className="hidden sm:table-cell">
+                    QR Code
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -331,6 +451,14 @@ function EventSessionsAdmin({ params }: { params: { eventCode: string } }) {
                           QR Scanner (Hardware)
                         </Button>
                       </TableCell>
+                      <TableCell>
+                        <QRDownloader
+                          text={`${params.eventCode}+${session.code}`}
+                          title={`${eventDetails?.title}`}
+                          subheading={`${session.title}`}
+                          filename={`QR-${eventDetails?.title} ${session.title}`}
+                        />
+                      </TableCell>
                     </TableRow>
                   ))
                 ) : (
@@ -345,114 +473,249 @@ function EventSessionsAdmin({ params }: { params: { eventCode: string } }) {
           </>
         )}
       </div>
-      <h2 className="text-xl font-bold my-6 text-center">
-        Manual Registration
-      </h2>
-      <div className="relative w-full max-w-lg mx-auto">
-        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-        <div className="flex w-full max-w-sm items-center space-x-2">
-          {" "}
-          <Input
-            type="search"
-            placeholder="Search a user"
-            className="w-full rounded-lg bg-background pl-8"
-            onChange={(e) => {
-              const value = e.target.value;
-              setSearchQuery(value);
-              if (value === "") {
-                setSearchQuery(null);
-                fetchUsers();
-              }
-            }}
-          />
-          <Button
-            type="submit"
-            onClick={() => {
-              fetchUsers(null, null, searchQuery);
-            }}
-          >
-            Search
-          </Button>
+      <section className="container mx-auto space-y-4 px-4 pb-10">
+        <div className="space-y-1 text-center">
+          <h2 className="text-xl font-bold">Manual Registration</h2>
+          <p className="text-sm text-muted-foreground">
+            Select an instance and register attendees without scanning.
+          </p>
         </div>
-        <RadioGroup
-          className="flex flex-row mt-4"
-          onValueChange={(value) => setSelectedSession(value)}
-          defaultValue={sessions[0]?.code}
-        >
-          {sessions.map((session, index) => (
-            <div key={index} className="flex items-center space-x-1">
-              <RadioGroupItem value={session.code} id={session.code} />
-              <Label htmlFor={session.code}>{session.title}</Label>
+
+        <Card>
+          <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle>Choose an instance</CardTitle>
+              <CardDescription>
+                Pick where these registrations should land.
+              </CardDescription>
             </div>
-          ))}
-        </RadioGroup>
-      </div>
-      <div className="p-4 my-4 w-[90%] mx-auto mt-4">
-        <Table>
-          {!searchQuery && (
-            <TableCaption>Total Users: {pagination?.totalData}</TableCaption>
-          )}
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Community ID</TableHead>
-              <TableHead>Phone Number</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Department Name</TableHead>
-              <TableHead>Cool Name</TableHead>
-              <TableHead>Register</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {users &&
-              users.map((user) => (
-                <TableRow key={user.communityId}>
-                  <TableCell className="font-medium">{user.name}</TableCell>
-                  <TableCell>{user.communityId}</TableCell>
-                  <TableCell>{user.phoneNumber}</TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>{user.departmentName ?? null}</TableCell>
-                  <TableCell>{user.coolName ?? null}</TableCell>
-                  <TableCell>
-                    <Button onClick={() => registerUser(user)}>Register</Button>
-                  </TableCell>
-                </TableRow>
+            {selectedSessionDetails && (
+              <Badge variant="secondary" className="w-fit">
+                {selectedSessionDetails.status}
+              </Badge>
+            )}
+          </CardHeader>
+          <CardContent>
+            <div className="mb-6 space-y-3 rounded-lg border bg-muted/20 p-4">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="text-base font-semibold">Event reports</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Download registrations for the selected instance.
+                  </p>
+                </div>
+                <div className="grid w-full gap-2 sm:w-auto sm:grid-cols-2">
+                  <Button
+                    type="button"
+                    onClick={() => downloadEventReport("csv")}
+                    disabled={reportDownload !== null}
+                    className="w-full sm:w-auto"
+                  >
+                    {reportDownload === "csv" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
+                    Export CSV
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => downloadEventReport("xlsx")}
+                    disabled={reportDownload !== null}
+                    className="w-full sm:w-auto"
+                  >
+                    {reportDownload === "xlsx" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
+                    Export XLSX
+                  </Button>
+                </div>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {sessions.map((session) => (
+                <button
+                  key={session.code}
+                  onClick={() => setSelectedSession(session.code)}
+                  className={cn(
+                    "rounded-xl border bg-background p-4 text-left transition hover:border-primary/50 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                    selectedSession === session.code
+                      ? "border-primary ring-2 ring-primary/30"
+                      : "border-muted"
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-1">
+                      <p className="text-xs uppercase text-muted-foreground">
+                        Instance
+                      </p>
+                      <h3 className="text-base font-semibold">
+                        {session.title}
+                      </h3>
+                    </div>
+                    <Badge variant="outline">{session.status}</Badge>
+                  </div>
+                  <dl className="mt-4 grid grid-cols-2 gap-2 text-xs sm:text-sm">
+                    <div className="rounded-lg bg-muted/50 px-3 py-2">
+                      <dt className="text-muted-foreground">Total</dt>
+                      <dd className="font-semibold">{session.totalSeats}</dd>
+                    </div>
+                    <div className="rounded-lg bg-muted/50 px-3 py-2">
+                      <dt className="text-muted-foreground">Booked</dt>
+                      <dd className="font-semibold">{session.bookedSeats}</dd>
+                    </div>
+                    <div className="col-span-2 rounded-lg bg-muted/50 px-3 py-2">
+                      <dt className="text-muted-foreground">Remaining</dt>
+                      <dd className="font-semibold">
+                        {session.totalRemainingSeats}
+                      </dd>
+                    </div>
+                  </dl>
+                </button>
               ))}
-          </TableBody>
-        </Table>
-      </div>
-      <div className="w-full flex justify-center mb-10">
-        <Pagination>
-          <PaginationContent>
-            {pagination?.previous && (
-              <PaginationItem>
-                <PaginationPrevious
-                  onClick={() => {
-                    if (searchQuery) {
-                      fetchUsers(pagination.previous, "prev", searchQuery);
-                    } else {
-                      fetchUsers(pagination.previous, "prev");
+            </div>
+            {sessions.length === 0 && (
+              <p className="text-center text-sm text-muted-foreground">
+                No sessions available for manual registration.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Find a user to register</CardTitle>
+            <CardDescription>
+              {selectedSessionDetails
+                ? `Adding people to ${selectedSessionDetails.title}`
+                : "Select an instance to enable registration."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative w-full sm:max-w-sm">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Search a user"
+                  className="w-full rounded-lg bg-background pl-8"
+                  value={searchQuery ?? ""}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setSearchQuery(value);
+                    if (value === "") {
+                      setSearchQuery(null);
+                      fetchUsers();
                     }
                   }}
                 />
-              </PaginationItem>
-            )}
-            {pagination?.next && (
-              <PaginationItem>
-                <PaginationNext
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
                   onClick={() => {
-                    if (searchQuery) {
-                      fetchUsers(pagination.next, "next", searchQuery);
-                    } else {
-                      fetchUsers(pagination.next, "next");
-                    }
+                    fetchUsers(null, null, searchQuery);
                   }}
-                />
-              </PaginationItem>
-            )}
-          </PaginationContent>
-        </Pagination>
-      </div>
+                >
+                  Search
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setSearchQuery(null);
+                    fetchUsers();
+                  }}
+                >
+                  Reset
+                </Button>
+              </div>
+            </div>
+            <div className="overflow-hidden rounded-lg border">
+              <Table>
+                {!searchQuery && (
+                  <TableCaption>
+                    Total Users: {pagination?.totalData}
+                  </TableCaption>
+                )}
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Community ID</TableHead>
+                    <TableHead>Phone Number</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Department Name</TableHead>
+                    <TableHead>Cool Name</TableHead>
+                    <TableHead>Register</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users &&
+                    users.map((user) => (
+                      <TableRow key={user.communityId}>
+                        <TableCell className="font-medium">
+                          {user.name}
+                        </TableCell>
+                        <TableCell>{user.communityId}</TableCell>
+                        <TableCell>{user.phoneNumber}</TableCell>
+                        <TableCell>{user.email}</TableCell>
+                        <TableCell>{user.departmentName ?? null}</TableCell>
+                        <TableCell>{user.coolName ?? null}</TableCell>
+                        <TableCell>
+                          <Button
+                            disabled={!selectedSession}
+                            onClick={() => registerUser(user)}
+                          >
+                            Register
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="flex justify-center">
+              <Pagination>
+                <PaginationContent>
+                  {pagination?.previous && (
+                    <PaginationItem>
+                      <PaginationPrevious
+                        onClick={() => {
+                          if (searchQuery) {
+                            fetchUsers(
+                              pagination.previous,
+                              "prev",
+                              searchQuery
+                            );
+                          } else {
+                            fetchUsers(pagination.previous, "prev");
+                          }
+                        }}
+                      />
+                    </PaginationItem>
+                  )}
+                  {pagination?.next && (
+                    <PaginationItem>
+                      <PaginationNext
+                        onClick={() => {
+                          if (searchQuery) {
+                            fetchUsers(pagination.next, "next", searchQuery);
+                          } else {
+                            fetchUsers(pagination.next, "next");
+                          }
+                        }}
+                      />
+                    </PaginationItem>
+                  )}
+                </PaginationContent>
+              </Pagination>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
     </>
   );
 }

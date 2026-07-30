@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import Image from "next/image";
+import SnowfallComponent from "@/components/SnowfallComponent";
 import {
   Card,
   CardContent,
@@ -19,7 +20,7 @@ import { useRouter } from "next/navigation";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import withAuth from "@/components/providers/AuthWrapper";
 import { useAuth } from "@/components/providers/AuthProvider";
-import { formatDate } from "@/lib/utils";
+import { formatDate, hasType } from "@/lib/utils";
 
 const EventsPage = () => {
   const [events, setEvents] = useState<any[]>([]); // State to hold fetched events
@@ -31,6 +32,9 @@ const EventsPage = () => {
   const router = useRouter();
   const { isAuthenticated, handleExpiredToken, getValidAccessToken } =
     useAuth();
+  const userData = isAuthenticated
+    ? JSON.parse(localStorage.getItem("userData") || "{}")
+    : null;
 
   // Fetch events on component mount
   useEffect(() => {
@@ -81,6 +85,8 @@ const EventsPage = () => {
   return (
     <>
       <HeaderNav name="Events" link="home"></HeaderNav>
+      {/* <SnowfallComponent /> */}
+
       <main>
         <div className="my-4 mx-2 flex relative flex-1 md:grow-0">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -150,193 +156,76 @@ const EventsPage = () => {
                           </Badge>
                         </div>
 
-                        <div className="p-4">
-                          {event.code === "b8d78bd" ? (
-                            <>
-                              {/* Section: Special Training Info */}
-                              <div className="p-4">
-                                <p className="text-sm text-gray-500 mb-3">
+                        {event.code === "9b52177" ? (
+                          <>
+                            <p className="text-sm text-gray-500 mb-3">
+                              Mari bersama-sama membangun mezbah doa dan
+                              mendengarkan Firman Tuhan setiap pagi! 🔥🙌
+                            </p>
+                            <div className="text-sm text-gray-500 mb-4 space-y-2">
+                              <p className="font-semibold text-gray-700">
+                                📌 Informasi Pertemuan:
+                              </p>
+                              <ul className="list-disc pl-4 space-y-1">
+                                <li>
+                                  Dilaksanakan setiap
                                   <span className="font-medium text-gray-700">
-                                    Pelatihan Bernyanyi Dasar (Training for
-                                    Basic Singing)
-                                  </span>{" "}
-                                  bagi anak-anak Grow Children kelas 1–6 SD oleh{" "}
-                                  <span className="font-medium text-gray-700">
-                                    Elaine Tjokro
+                                    {" "}
+                                    Selasa sampai Kamis
                                   </span>
                                   .
-                                </p>
+                                </li>
+                                <li>
+                                  Waktu pertemuan pukul
+                                  <span className="font-medium text-gray-700">
+                                    {" "}
+                                    06.00 – 07.00 WIB
+                                  </span>
+                                  .
+                                </li>
+                                <li>
+                                  Pertemuan berlangsung secara online via Zoom.
+                                </li>
+                              </ul>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <p className="font-semibold text-gray-700">
+                              Event Time:
+                            </p>
+                            <p className="text-sm text-gray-500 mb-3">
+                              <span className="font-medium text-gray-700">
+                                Start:{" "}
+                                {formatDate(new Date(event.eventStartAt))}
+                              </span>
+                            </p>
+                            <p className="text-sm text-gray-500 mb-3">
+                              <span className="font-medium text-gray-700">
+                                End: {formatDate(new Date(event.eventEndAt))}
+                              </span>
+                            </p>
 
-                                <p className="font-semibold text-gray-700 mb-2">
-                                  📌 Informasi Pelatihan:
-                                </p>
-                                <ul className="list-disc pl-6 text-sm text-gray-500 space-y-1 mb-4">
-                                  <li>
-                                    Pelatihan dimulai tanggal{" "}
-                                    <span className="font-medium text-gray-700">
-                                      7 Oktober 2025
-                                    </span>{" "}
-                                    sampai minggu pertama bulan{" "}
-                                    <span className="font-medium text-gray-700">
-                                      Desember 2025
-                                    </span>
-                                    .
-                                  </li>
-                                  <li>
-                                    Pelatihan berlangsung{" "}
-                                    <span className="font-medium text-gray-700">
-                                      1x seminggu
-                                    </span>{" "}
-                                    dengan durasi{" "}
-                                    <span className="font-medium text-gray-700">
-                                      30 menit
-                                    </span>
-                                    .
-                                  </li>
-                                  <li>
-                                    <em>
-                                      Jadwal hanya dipilih satu yang paling
-                                      sesuai.
-                                    </em>
-                                  </li>
-                                </ul>
+                            <p className="font-semibold text-gray-700">
+                              Registration Time:
+                            </p>
+                            <p className="text-sm text-gray-500 mb-3">
+                              <span className="font-medium text-gray-700">
+                                Open:{" "}
+                                {formatDate(new Date(event.registerStartAt))}
+                              </span>
+                            </p>
+                            <p className="text-sm text-gray-500 mb-3">
+                              <span className="font-medium text-gray-700">
+                                Closed:{" "}
+                                {formatDate(new Date(event.registerEndAt))}
+                              </span>
+                            </p>
+                          </>
+                        )}
 
-                                {/* Section: Schedule */}
-                                <p className="font-semibold text-gray-700 mb-2">
-                                  📌 Pilihan Hari dan Jam:
-                                </p>
-
-                                <div className="flex flex-col md:flex-row gap-6 w-full">
-                                  {/* Selasa */}
-                                  <div className="flex-1">
-                                    <p className="text-sm text-gray-500 mb-2">
-                                      <span className="font-medium text-gray-700">
-                                        🗓 Selasa
-                                      </span>
-                                    </p>
-                                    <ul className="list-disc pl-6 text-sm text-gray-500 space-y-1 mb-3">
-                                      <li>
-                                        <span className="font-medium text-gray-700">
-                                          Grade 1 &amp; 2
-                                        </span>{" "}
-                                        : 16.00 – 16.30 <strong>(Full)</strong>
-                                      </li>
-                                      <li>
-                                        <span className="font-medium text-gray-700">
-                                          Grade 3 – 6
-                                        </span>{" "}
-                                        : 16.30 – 17.00 <strong>(Full)</strong>
-                                      </li>
-                                      <li>
-                                        <span className="font-medium text-gray-700">
-                                          Grade 3 – 6
-                                        </span>{" "}
-                                        : 17.15 – 17.45 <strong>(Full)</strong>
-                                      </li>
-                                    </ul>
-                                  </div>
-                                  {/* Kamis */}
-                                  <div className="flex-1">
-                                    <p className="text-sm text-gray-500 mb-2">
-                                      <span className="font-medium text-gray-700">
-                                        🗓 Kamis
-                                      </span>
-                                    </p>
-                                    <ul className="list-disc pl-6 text-sm text-gray-500 space-y-1">
-                                      <li>
-                                        <span className="font-medium text-gray-700">
-                                          Grade 1 &amp; 2
-                                        </span>{" "}
-                                        : 16.00 – 16.30 <strong>(Full)</strong>
-                                      </li>
-                                      <li>
-                                        <span className="font-medium text-gray-700">
-                                          Grade 3 – 6
-                                        </span>{" "}
-                                        : 16.30 – 17.00
-                                      </li>
-                                      <li>
-                                        <span className="font-medium text-gray-700">
-                                          Grade 3 – 6
-                                        </span>{" "}
-                                        : 17.15 – 17.45
-                                      </li>
-                                    </ul>
-                                  </div>
-                                </div>
-                              </div>
-                            </>
-                          ) : event.code === "9b52177" ? (
-                            <>
-                              <p className="text-sm text-gray-500 mb-3">
-                                Mari bersama-sama membangun mezbah doa dan
-                                mendengarkan Firman Tuhan setiap pagi! 🔥🙌
-                              </p>
-                              <div className="text-sm text-gray-500 mb-4 space-y-2">
-                                <p className="font-semibold text-gray-700">
-                                  📌 Informasi Pertemuan:
-                                </p>
-                                <ul className="list-disc pl-4 space-y-1">
-                                  <li>
-                                    Dilaksanakan setiap
-                                    <span className="font-medium text-gray-700">
-                                      {" "}
-                                      Selasa sampai Kamis
-                                    </span>
-                                    .
-                                  </li>
-                                  <li>
-                                    Waktu pertemuan pukul
-                                    <span className="font-medium text-gray-700">
-                                      {" "}
-                                      06.00 – 07.00 WIB
-                                    </span>
-                                    .
-                                  </li>
-                                  <li>
-                                    Pertemuan berlangsung secara online via
-                                    Zoom.
-                                  </li>
-                                </ul>
-                              </div>
-                            </>
-                          ) : (
-                            <>
-                              <p className="font-semibold text-gray-700">
-                                Event Time:
-                              </p>
-                              <p className="text-sm text-gray-500 mb-3">
-                                <span className="font-medium text-gray-700">
-                                  Start:{" "}
-                                  {formatDate(new Date(event.eventStartAt))}
-                                </span>
-                              </p>
-                              <p className="text-sm text-gray-500 mb-3">
-                                <span className="font-medium text-gray-700">
-                                  End: {formatDate(new Date(event.eventEndAt))}
-                                </span>
-                              </p>
-
-                              <p className="font-semibold text-gray-700">
-                                Registration Time:
-                              </p>
-                              <p className="text-sm text-gray-500 mb-3">
-                                <span className="font-medium text-gray-700">
-                                  Open:{" "}
-                                  {formatDate(new Date(event.registerStartAt))}
-                                </span>
-                              </p>
-                              <p className="text-sm text-gray-500 mb-3">
-                                <span className="font-medium text-gray-700">
-                                  Closed:{" "}
-                                  {formatDate(new Date(event.registerEndAt))}
-                                </span>
-                              </p>
-                            </>
-                          )}
-
-                          <div className="mt-4">
-                            {/* {" "}
+                        <div className="mt-4">
+                          {/* {" "}
                           <p className="font-semibold text-gray-700">
                             Total Remaining Seats:
                           </p>
@@ -345,53 +234,52 @@ const EventsPage = () => {
                               {event.totalRemainingSeats}
                             </span>
                           </p> */}
-                            {/* Link to event sessions page */}
-                            <div className="flex justify-center md:justify-start">
-                              {event.code === "9b52177" ? (
+                          {/* Link to event sessions page */}
+                          <div className="flex justify-center md:justify-start">
+                            {event.code === "9b52177" ? (
+                              <Button
+                                className="mx-auto w-full"
+                                onClick={() =>
+                                  window.open(
+                                    "https://us02web.zoom.us/j/6818886818?pwd=VVEbaIaBAa8TSEblu2hqalrXSRfrRs.1&omn=82687139138",
+                                    "_blank",
+                                    "noopener,noreferrer",
+                                  )
+                                }
+                              >
+                                Join Zoom
+                              </Button>
+                            ) : event.availabilityStatus === "available" ? (
+                              event.code === "b8d78bd" ? (
                                 <Button
                                   className="mx-auto w-full"
                                   onClick={() =>
                                     window.open(
-                                      "https://us02web.zoom.us/j/6818886818?pwd=VVEbaIaBAa8TSEblu2hqalrXSRfrRs.1&omn=82687139138",
+                                      "https://docs.google.com/forms/d/e/1FAIpQLSfqh-fBpM8oBpdq2agaEFXzAzL8fTjKrg8qHjib54E0RU_jGQ/viewform",
                                       "_blank",
-                                      "noopener,noreferrer"
+                                      "noopener,noreferrer",
                                     )
                                   }
                                 >
-                                  Join Zoom
-                                </Button>
-                              ) : event.availabilityStatus === "available" ? (
-                                event.code === "b8d78bd" ? (
-                                  <Button
-                                    className="mx-auto w-full"
-                                    onClick={() =>
-                                      window.open(
-                                        "https://docs.google.com/forms/d/e/1FAIpQLSfqh-fBpM8oBpdq2agaEFXzAzL8fTjKrg8qHjib54E0RU_jGQ/viewform",
-                                        "_blank",
-                                        "noopener,noreferrer"
-                                      )
-                                    }
-                                  >
-                                    Register Now!
-                                  </Button>
-                                ) : (
-                                  <Button
-                                    className="mx-auto w-full "
-                                    onClick={() => handleSession(event.code)}
-                                  >
-                                    Register Now!
-                                  </Button>
-                                )
-                              ) : event.status === "walkin" ? (
-                                <Button disabled>
-                                  Walk-in : Register On Site
+                                  Register Now!
                                 </Button>
                               ) : (
-                                <>
-                                  <Button disabled>Unavailable</Button>
-                                </>
-                              )}
-                            </div>
+                                <Button
+                                  className="mx-auto w-full "
+                                  onClick={() => handleSession(event.code)}
+                                >
+                                  Register Now!
+                                </Button>
+                              )
+                            ) : event.status === "walkin" ? (
+                              <Button disabled>
+                                Walk-in : Register On Site
+                              </Button>
+                            ) : (
+                              <>
+                                <Button disabled>Unavailable</Button>
+                              </>
+                            )}
                           </div>
                         </div>
                       </CardContent>

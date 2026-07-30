@@ -138,6 +138,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({
         duration: 3000,
       });
       logout();
+
       router.refresh();
     }
   };

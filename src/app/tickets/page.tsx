@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import HeaderNav from "@/components/HeaderNav";
 import { useAuth } from "@/components/providers/AuthProvider";
 import withAuth from "@/components/providers/AuthWrapper";
+import ReactMarkdown from "react-markdown";
 import { useQRCode } from "next-qrcode";
 import {
   Card,
@@ -297,13 +298,14 @@ const TicketsPage = () => {
                     <Separator></Separator>
                     <CardContent className="flex flex-col justify-center items-center w-full">
                       <p className="text-sm text-gray-700 w-full">
-                        <b>Session:</b> {registration.sessionName} ({registration.sessionCode})
+                        <b>Session:</b> {registration.sessionName} (
+                        {registration.sessionCode})
                       </p>
-                      <p className="text-sm text-gray-700 w-full break-words overflow-auto max-h-32 mt-2">
-                        <b>Description:</b>{" "}
-                        <span className="inline-block">
-                          {convertLinksToAnchors(registration.sessionDescription || "")}
-                        </span>
+                      <p className="text-sm  text-gray-700 w-full break-words overflow-auto max-h-32 mt-3">
+                        <b className="">Description:</b>{" "}
+                        <ReactMarkdown>
+                          {registration.sessionDescription}
+                        </ReactMarkdown>
                       </p>
                     </CardContent>
                     <CardFooter>
